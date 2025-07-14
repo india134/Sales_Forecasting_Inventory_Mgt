@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Inventory Forecasting</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <h3 class="text-center">📦 <strong>Product-wise Inventory Forecasting</strong></h3>
+
+    <!-- Product Dropdown -->
+    <div class="text-center mt-3">
+        <label><strong>📑 Choose Product</strong></label>
+        <select id="productSelect" class="form-control w-50 mx-auto">
+            <option value="Product_1">Product_1</option>
+            <option value="Product_2">Product_2</option>
+            <option value="Product_3">Product_3</option>
+            <option value="Product_4">Product_4</option>
+            <option value="Product_5">Product_5</option>
+        </select>
+    </div>
+
+    <!-- Forecast Chart -->
+    <div class="mt-4">
+        <canvas id="forecastChart" height="100"></canvas>
+    </div>
+
+    <!-- Alert Text -->
+    <div class="text-center mt-3">
+        <h5 id="alertText" class="text-danger font-weight-bold"></h5>
+    </div>
+
+    <!-- Inventory Info -->
+    <div class="text-center mt-2">
+        <p>📦 <strong>Current Stock:</strong> <span id="stock">-</span></p>
+        <p>📊 <strong>Days Covered:</strong> <span id="daysCovered">-</span></p>
+        <p>🚛 <strong>Lead Time:</strong> <span id="leadTime">-</span> days</p>
+        <p>📉 <strong>Reorder in:</strong> <span id="reorderInDays">-</span> days</p>
+    </div>
+
+    <!-- Quantity Needed Input -->
+    <div class="text-center mt-4">
+        <label for="daysInput">📅 Enter number of days to check demand:</label>
+        <input type="number" id="daysInput" class="form-control w-25 mx-auto mt-2" placeholder="e.g. 10">
+        <p class="mt-2">📦 <strong>Required Quantity:</strong> <span id="requiredQuantity">-</span></p>
+    </div>
+
+    <!-- Reorder Now Button -->
+    <div class="text-center mt-4">
+        <button class="btn btn-primary" id="reorderBtn">Reorder Now</button>
+    </div>
+
+    <!-- Reorder Form -->
+    <div class="text-center mt-4" id="reorderForm" style="display: none;">
+        <label for="quantityInput">🔢 Quantity to Order:</label>
+        <input type="number" id="quantityInput" class="form-control w-25 mx-auto mb-2">
+
+        <label for="deliveryDate">📅 Delivery Date:</label>
+        <input type="date" id="deliveryDate" class="form-control w-25 mx-auto mb-3">
+
+        <button class="btn btn-success" id="sendEmailBtn">Send Email</button>
+    </div>
+</div>
+
+<script>
+let chart;
+
+function renderChart(forecast) {
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+    const labels = forecast.map((_, i) => `Day ${i + 1}`);
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Forecasted Units Sold',
+                data: forecast,
+                borderColor: 'blue',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 4
+            }]
+        },
+        options: { responsive: true }
+    });
+}
+
+function fetchStatus() {
+    const product = document.getElementById("productSelect").value;
+    const days = document.getElementById("daysInput").value;
+
+    fetch("/status", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product: product, days: days })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        renderChart(data.forecast);
+        document.getElementById("stock").innerText = data.current_stock;
+        document.getElementById("daysCovered").innerText = data.days_covered;
+        document.getElementById("leadTime").innerText = data.lead_time;
+        document.getElementById("reorderInDays").innerText = data.reorder_in_days;
+        document.getElementById("alertText").innerText = data.alert_text;
+        document.getElementById("requiredQuantity").innerText = data.quantity_needed;
+    });
+}
+
+// Events
+document.getElementById("productSelect").addEventListener("change", fetchStatus);
+document.getElementById("daysInput").addEventListener("input", fetchStatus);
+
+document.getElementById("reorderBtn").addEventListener("click", () => {
+    const form = document.getElementById("reorderForm");
+    form.style.display = (form.style.display === "none" || form.style.display === "") ? "block" : "none";
+});
+
+
+
+document.getElementById("sendEmailBtn").addEventListener("click", () => {
+    const product = document.getElementById("productSelect").value;
+    const quantity = document.getElementById("quantityInput").value;
+    const delivery_date = document.getElementById("deliveryDate").value;
+
+    if (!quantity || !delivery_date) {
+        alert("Enter both quantity and delivery date.");
+        return;
+    }
+
+    fetch("/send_email", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product, quantity, delivery_date })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert("Email sent successfully.");
+            document.getElementById("reorderForm").style.display = "none";
+        } else {
+            alert("Failed to send email: " + data.error);
+        }
+    });
+});
+
+// Load default on page load
+window.onload = fetchStatus;
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
